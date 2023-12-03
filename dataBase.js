@@ -94,7 +94,7 @@ export class FundingDB {
 
     async getLatestAddressInfo(address) {
       return new Promise((resolve, reject) => {
-        const query = `SELECT spent_txo_count, balance FROM address_info WHERE address = ? ORDER BY date DESC LIMIT 1`;
+        const query = `SELECT * FROM address_info WHERE address = ? ORDER BY date DESC LIMIT 1`;
         db.get(query, [address], (err, row) => {
           if (err) {
             reject(err);
