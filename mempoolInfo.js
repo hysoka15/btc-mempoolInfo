@@ -9,6 +9,7 @@ const addressData = JSON.parse(fs.readFileSync('address.json', 'utf8'));
 const addresses = addressData.total_addresses;
 
 const fundingDb = new FundingDB();
+let btcPrice = 38000;
 
 
 function toUTC8String(date) {
@@ -28,6 +29,8 @@ function toUTC8String(date) {
 
 
 async function main() { 
+    btcPrice = await getBitcoinPriceMempool();
+    console.log('current Price',btcPrice);
     let totalBalance = 0;
     const date = new Date();
     const dateTime = toUTC8String(date);
@@ -51,8 +54,22 @@ async function main() {
 
             totalBalance += balance;
             totalSpentTXO += spent_txo_count;
-            // address,date, spent_txo_count,balance
-            fundingDb.insertAddressInfo(address,dateTime,spent_txo_count, balance);
+      
+            const latestRecord = await fundingDb.getLatestAddressInfo(address);
+            //跟上次记录有变化，添加差异记录
+            if (!latestRecord || latestRecord.spent_txo_count !== spent_txo_count || latestRecord.balance !== balance || latestRecord.funded_txo_count != funded_txo_count) {
+                let spend_txo_diff = spent_txo_count - latestRecord.spent_txo_count;
+                let balance_diff = balance - latestRecord.balance;
+                let funded_txo_count_diff = latestRecord.funded_txo_count ? funded_txo_count - latestRecord.funded_txo_count : 0;
+                let spend_unit = balance_diff < 0 ? balance_diff / spend_txo_diff : 0;
+                let funded_unit = balance_diff > 0 ? balance_diff / funded_txo_count_diff : 0;
+                let spend_unit_usd = spend_unit * btcPrice;
+                let funded_unit_usd = funded_unit * btcPrice;
+                fundingDb.insertDifferenceInfo(address,dateTime, spend_txo_diff,funded_txo_count_diff,balance_diff,spend_unit,funded_unit,btcPrice,spend_unit_usd,funded_unit_usd);
+            }
+
+            fundingDb.insertAddressInfo(address,dateTime,spent_txo_count,funded_txo_count, balance);
+
             queryIndex ++;
             await sleeper(3);
         }catch(error){
@@ -71,6 +88,16 @@ async function getAddressInfo(address) {
         return response.data;
     } catch (error) {
         console.error('Error fetching address data:', error);
+        return null;
+    }
+}
+
+async function getBitcoinPriceMempool() {
+    try {
+        const response = await axios.get('https://mempool.space/api/v1/historical-price');
+        return response.data.prices[0].USD;
+    } catch (error) {
+        console.error('Error fetching Bitcoin price from CoinGecko:', error);
         return null;
     }
 }
