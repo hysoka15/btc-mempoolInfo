@@ -18,13 +18,16 @@ export class FundingDB {
           date TEXT NOT NULL,
           spent_txo_count INTEGER NOT NULL,
           funded_txo_count INTEGER NOT NULL,
-          balance INTEGER NOT NULL
+          balance INTEGER NOT NULL,
+          balance_in_usd INTEGER,
+          note TEXT
         )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS summary_info (
           date TEXT NOT NULL,
           total_spent_txo INTEGER NOT NULL,
-            total_balance INTEGER NOT NULL
+            total_balance INTEGER NOT NULL,
+            balance_in_usd INTEGER
         )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS different_info (
@@ -72,9 +75,9 @@ export class FundingDB {
         });
     }
 
-    insertAddressInfo(address,date, spent_txo_count,funded_txo_count,balance) {
-      const sql = `INSERT INTO address_info (address, date,spent_txo_count, funded_txo_count,balance) VALUES (?, ?, ?, ?,?)`;
-      db.run(sql, [address, date, spent_txo_count,funded_txo_count, balance], (err) => {
+    insertAddressInfo(address,date, spent_txo_count,funded_txo_count,balance,balance_in_usd,note) {
+      const sql = `INSERT INTO address_info (address, date,spent_txo_count, funded_txo_count,balance,balance_in_usd,note) VALUES (?, ?, ?, ?,?,?,?)`;
+      db.run(sql, [address, date, spent_txo_count,funded_txo_count, balance,balance_in_usd,note], (err) => {
         if (err) {
           return console.error(err.message);
         }
@@ -82,9 +85,9 @@ export class FundingDB {
       });
     }
 
-    insertSummary(date, total_spent_txo,total_balance) {
-      const sql = `INSERT INTO summary_info (date,total_spent_txo, total_balance) VALUES (?,?, ?)`;
-        db.run(sql, [date, total_spent_txo,total_balance], (err) => {
+    insertSummary(date, total_spent_txo,total_balance,balance_in_usd) {
+      const sql = `INSERT INTO summary_info (date,total_spent_txo, total_balance,balance_in_usd) VALUES (?,?, ?,?)`;
+        db.run(sql, [date, total_spent_txo,total_balance,balance_in_usd], (err) => {
           if (err) {
             return console.error(err.message);
           }

@@ -8,6 +8,8 @@ import axios from 'axios';
 const addressData = JSON.parse(fs.readFileSync('address.json', 'utf8'));
 const addresses = addressData.total_addresses;
 
+const addressNames = addressData.address_names;
+
 const fundingDb = new FundingDB();
 let btcPrice = 38000;
 
@@ -38,6 +40,9 @@ async function main() {
     const totalLen = addresses.length;
     let queryIndex = 0;
     let totalSpentTXO = 0;
+    let total_diff_balance = 0;
+    let total_diff_funded = 0;
+    let total_diff_spent = 0;
 
     while(queryIndex < totalLen){
         let address = addresses[queryIndex];
@@ -58,17 +63,22 @@ async function main() {
             const latestRecord = await fundingDb.getLatestAddressInfo(address);
             //跟上次记录有变化，添加差异记录
             if (!latestRecord || latestRecord.spent_txo_count !== spent_txo_count || latestRecord.balance !== balance || latestRecord.funded_txo_count != funded_txo_count) {
-                let spend_txo_diff = spent_txo_count - latestRecord.spent_txo_count;
-                let balance_diff = balance - latestRecord.balance;
-                let funded_txo_count_diff = latestRecord.funded_txo_count ? funded_txo_count - latestRecord.funded_txo_count : 0;
+                let spend_txo_diff = latestRecord ? spent_txo_count - latestRecord.spent_txo_count : spent_txo_count;
+                let balance_diff = latestRecord ? balance - latestRecord.balance : balance;
+                let funded_txo_count_diff = (latestRecord && latestRecord.funded_txo_count) ? funded_txo_count - latestRecord.funded_txo_count : 0;
                 let spend_unit = balance_diff < 0 ? balance_diff / spend_txo_diff : 0;
                 let funded_unit = balance_diff > 0 ? balance_diff / funded_txo_count_diff : 0;
-                let spend_unit_usd = spend_unit * btcPrice;
-                let funded_unit_usd = funded_unit * btcPrice;
+                let spend_unit_usd = Number(spend_unit * btcPrice).toFixed(4);
+                let funded_unit_usd = Number(funded_unit * btcPrice).toFixed(4);
                 fundingDb.insertDifferenceInfo(address,dateTime, spend_txo_diff,funded_txo_count_diff,balance_diff,spend_unit,funded_unit,btcPrice,spend_unit_usd,funded_unit_usd);
+
+                total_diff_balance += balance_diff;
+                total_diff_funded += funded_txo_count_diff;
+                total_diff_spent += funded_txo_count_diff;
             }
 
-            fundingDb.insertAddressInfo(address,dateTime,spent_txo_count,funded_txo_count, balance);
+            let balance_in_usd = Number(balance * btcPrice).toFixed(4);
+            fundingDb.insertAddressInfo(address,dateTime,spent_txo_count,funded_txo_count, balance,balance_in_usd,addressNames[queryIndex]);
 
             queryIndex ++;
             await sleeper(3);
@@ -79,7 +89,15 @@ async function main() {
         }
     }
     console.log('totalbalance',totalBalance,"totalSpentTXO",totalSpentTXO);
-    fundingDb.insertSummary(dateTime, totalSpentTXO,totalBalance);
+    fundingDb.insertSummary(dateTime, totalSpentTXO,totalBalance,Number(totalBalance * btcPrice).toFixed(4));
+
+    //总结差异
+    let sum_spend_unit = total_diff_balance < 0 ? total_diff_balance / total_diff_spent : 0;
+    let sum_funded_unit = total_diff_balance > 0 ? total_diff_balance / total_diff_funded : 0;
+    let sum_spend_unit_usd = Number(sum_spend_unit * btcPrice).toFixed(4);
+    let sum_funded_unit_usd = Number(sum_funded_unit * btcPrice).toFixed(4);
+
+    fundingDb.insertDifferenceInfo(dateTime + " summary",dateTime, total_diff_spent,total_diff_funded,total_diff_balance,sum_spend_unit,sum_funded_unit,btcPrice,sum_spend_unit_usd,sum_funded_unit_usd);
 }
 
 async function getAddressInfo(address) {
