@@ -5,13 +5,22 @@ const db = new (verbose().Database)('./funding.db');
 
 export class FundingDB {
     constructor(){
-        // db.serialize(() => {
-        //     db.run(`CREATE TABLE IF NOT EXISTS balances (
-        //         address TEXT NOT NULL,
-        //         date TEXT NOT NULL,
-        //         balance INTEGER NOT NULL
-        //       )`);
-        // });
+        db.serialize(() => {
+            db.run(`CREATE TABLE IF NOT EXISTS balances (
+                address TEXT NOT NULL,
+                date TEXT NOT NULL,
+                balance INTEGER NOT NULL,
+                balance_in_usd INTEGER,
+                note TEXT
+              )`);
+        });
+
+        db.run(`CREATE TABLE IF NOT EXISTS balance_difference (
+          address TEXT NOT NULL,
+          date TEXT NOT NULL,
+          balance_diff INTEGER NOT NULL,
+          note TEXT
+        )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS address_info (
           address TEXT NOT NULL,
@@ -55,14 +64,37 @@ export class FundingDB {
       });
     }
 
-    insertBalance(date, address, balance) {
-        const sql = `INSERT INTO balances (address, date, balance) VALUES (?, ?, ?)`;
-        db.run(sql, [address, date,  balance], (err) => {
+    insertBalance( address,date, balance,balance_in_usd,note) {
+        const sql = `INSERT INTO balances (address, date, balance,balance_in_usd,note) VALUES (?, ?, ?,?,?)`;
+        db.run(sql, [address, date,  balance,balance_in_usd,note], (err) => {
           if (err) {
             return console.error(err.message);
           }
           console.log(`${address}  inserted`);
         });
+    }
+
+    async getLatestBalanceInfo(address) {
+      return new Promise((resolve, reject) => {
+        const query = `SELECT * FROM balances WHERE address = ? ORDER BY date DESC LIMIT 1`;
+        db.get(query, [address], (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        });
+      });
+    }
+
+    insertBalanceDifference(address,date,balance_diff) {
+      const sql = `INSERT INTO balance_difference (address,date, balance_diff) VALUES (?, ?, ?)`;
+      db.run(sql, [address,date,balance_diff], (err) => {
+        if (err) {
+          return console.error(err.message);
+        }
+        console.log(`${address}  difference inserted..`);
+      });
     }
 
     insertTotalBalance(date, totalBalance) {

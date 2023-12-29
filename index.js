@@ -2,12 +2,15 @@ import fs from 'fs';
 import { getBalance,getHistory } from './utils.js';
 import { sleeper } from './utils.js';
 import { FundingDB } from './dataBase.js';
+import axios from 'axios';
 
 
 const addressData = JSON.parse(fs.readFileSync('address.json', 'utf8'));
 const addresses = addressData.total_addresses;
+const addressNames = addressData.address_names;
 
 const fundingDb = new FundingDB();
+let btcPrice = 38000;
 
 
 function toUTC8String(date) {
@@ -27,6 +30,7 @@ function toUTC8String(date) {
 
 
 async function main() { 
+    btcPrice = await getBitcoinPrice();
     let totalBalance = 0;
     // const date = new Date().toISOString().split('T')[0];
     const date = new Date();
@@ -35,11 +39,12 @@ async function main() {
     // const formattedDate = dateISO[0];
     // const formattedTime = dateISO[1].split(':')[0] + ':' + dateISO[1].split(':')[1];
     // const dateTime = formattedDate + ' ' + formattedTime;
-    console.log(dateTime); // 输出格式为 "YYYY-MM-DD HH:MM"
+    // console.log(dateTime); // 输出格式为 "YYYY-MM-DD HH:MM"
 
 
     const totalLen = addresses.length;
     let queryIndex = 0;
+    let total_diff_balance = 0;
 
     while(queryIndex < totalLen){
         let address = addresses[queryIndex];
@@ -47,9 +52,19 @@ async function main() {
             const balance = await getBalance(address);
             console.log(`Balance for ${address}: ${balance} BTC`);
             totalBalance += balance;
-            await sleeper(3);
-            fundingDb.insertBalance(dateTime, address, balance);
+            
+            const latestRecord = await fundingDb.getLatestBalanceInfo(address);
+            //跟上次记录有变化，添加差异记录
+            if (!latestRecord || latestRecord.balance !== balance) {
+                let balance_diff = latestRecord ? balance - latestRecord.balance : balance;
+                fundingDb.insertBalanceDifference(address,dateTime,balance_diff);
+
+                total_diff_balance += balance_diff;
+            }
+            fundingDb.insertBalance(address,dateTime, balance,Number(balance * btcPrice).toFixed(4),addressNames[queryIndex]);
+
             queryIndex ++;
+            await sleeper(3);
         }catch(error){
             console.log(error);
             console.log('查询出错，等10s..');
@@ -57,7 +72,21 @@ async function main() {
         }
     }
     console.log('totalbalance',totalBalance);
-    fundingDb.insertTotalBalance(dateTime, totalBalance);
+    fundingDb.insertBalance('balance summary', dateTime,totalBalance,Number(totalBalance * btcPrice).toFixed(4));
+    fundingDb.insertBalanceDifference("diffenence summary",dateTime, total_diff_balance);
+}
+
+async function getBitcoinPrice() {
+    try {
+        const url = 'https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD';
+        const response = await axios.get(url);
+        const price = response.data.USD;
+        console.log(`Bitcoin Price: $${price}`);
+        return price;
+    } catch (error) {
+        console.error('Error fetching Bitcoin price:', error);
+        return 43000;
+    }
 }
 
 async function getTransationCount() { 
@@ -88,3 +117,4 @@ async function getTransationCount() {
 
 main().catch(console.error);
 // getTransationCount();
+// getBalance('1PF28CArL2hR439WHFtoYD26oDCz8fFcMa');
