@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { getBalance,getHistory } from './utils.js';
+import { getBalance,getHistory,getBlockHeight } from './utils.js';
 import { sleeper } from './utils.js';
 import { FundingDB } from './dataBase.js';
 import axios from 'axios';
@@ -117,4 +117,5 @@ async function getTransationCount() {
 
 main().catch(console.error);
 // getTransationCount();
-// getBalance('1PF28CArL2hR439WHFtoYD26oDCz8fFcMa');
+// let res = await getBlockHeight();
+// console.log(res);

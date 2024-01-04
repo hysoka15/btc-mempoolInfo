@@ -18,8 +18,8 @@ import {
 } from "bitcoinjs-lib";
 
 
-// const ELECTRUMX_URL = 'https://foshan.team/new/proxy';
-const ELECTRUMX_URL = 'https://ep.atomicals.xyz/proxy';
+const ELECTRUMX_URL = 'https://ep.nextdao.xyz/proxy';
+// const ELECTRUMX_URL = 'https://ep.atomicals.xyz/proxy';
 
 
 export const sleeper = async (seconds) => {
@@ -48,6 +48,18 @@ async function call(method, params) {
 export async function getBalance(address){
     const scripthash = addressToScriptHash(address);
     return getBalanceHash(scripthash);
+}
+
+export async function getBlockHeight(){
+    const p = new Promise((resolve, reject) => {
+        call('blockchain.headers.subscribe').then(function (result) {
+            resolve(result);
+        }).catch((error) => {
+            reject(error);
+        })
+
+    });
+    return p;
 }
 
 function getBalanceHash(scripthash){
